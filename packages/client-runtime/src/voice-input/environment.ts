@@ -2,7 +2,7 @@ import { encodeSpeechPcmRequest } from "@t3tools/shared/speech";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { CloudSpeechError, SPEECH_STREAM_PATH } from "@t3tools/contracts";
+import { CloudSpeechError, ReadAloudError, SPEECH_STREAM_PATH } from "@t3tools/contracts";
 import type {
   CloudSpeechModelId,
   CloudSpeechProvider,
@@ -26,6 +26,9 @@ import { VoiceTranscriptionError } from "./transcription.ts";
 
 const INFERENCE_OR_DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
 const isCloudSpeechError = Schema.is(CloudSpeechError);
+const isReadAloudError = Schema.is(ReadAloudError);
+// The environment may spend 30s on a Keychain prompt and 30s on synthesis.
+const READ_ALOUD_TIMEOUT_MS = 70_000;
 type EnvironmentApiClient<G extends "voice" | "auth"> = Effect.Success<
   ReturnType<typeof makeEnvironmentHttpApiGroupClient<G>>
 >;
@@ -331,3 +334,30 @@ export const removeEnvironmentSpeechModel = (prepared: PreparedConnection, model
     path: (urls) => urls.removeModel(),
     run: ({ client, headers }) => client.removeModel({ headers, payload: { modelId } }),
   });
+
+export const getReadAloudStatus = (prepared: PreparedConnection) =>
+  request({
+    group: "voice",
+    prepared,
+    method: "GET",
+    timeoutMs: READ_ALOUD_TIMEOUT_MS,
+    path: (urls) => urls.readAloudStatus(),
+    run: ({ client, headers }) => client.readAloudStatus({ headers }),
+  });
+
+/** MP3 audio of `text`, made by the environment with its own ElevenLabs key. */
+export const synthesizeReadAloud = (prepared: PreparedConnection, text: string) =>
+  request({
+    group: "voice",
+    prepared,
+    method: "POST",
+    timeoutMs: READ_ALOUD_TIMEOUT_MS,
+    path: (urls) => urls.readAloud(),
+    run: ({ client, headers }) => client.readAloud({ headers, payload: { text } }),
+  }).pipe(
+    Effect.mapError((error) =>
+      error._tag === "RemoteEnvironmentAuthFetchError" && isReadAloudError(error.cause)
+        ? error.cause
+        : error,
+    ),
+  );

@@ -148,6 +148,7 @@ import type { SessionPhase } from "../../types";
 import type { DraftSessionState } from "../../composerDraftStore";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import type { useLogicalProjectEnvironments } from "../../hooks/useLogicalProjectEnvironments";
+import { silenceReadAloud } from "../../readAloud/readAloud";
 import type { useDraftEnvironmentRouting } from "./useDraftEnvironmentRouting";
 import type { useLocalDispatchState } from "./useLocalDispatchState";
 import type { usePendingThreadRequests } from "./usePendingThreadRequests";
@@ -667,6 +668,7 @@ export function useComposerSend(input: ComposerSendInput) {
       }
       const sendsDraft = hasSendableContent && !sendCtx.answeringPendingUserInput;
       sendInFlightRef.current = true;
+      silenceReadAloud();
       if (capabilities.supportsAttachmentUploads) startDraftAttachmentUploads(snapshot.attachments);
       // Cleared at send, like a regular message, so nothing in it can change or vanish mid-start.
       if (sendsDraft) {
@@ -1138,6 +1140,7 @@ export function useComposerSend(input: ComposerSendInput) {
     };
     sendInFlightRef.current = true;
     const sendGeneration = ++composerSendGenerationRef.current;
+    silenceReadAloud();
     const attachmentCapabilitiesBeforeUpload = readLiveAttachmentCapabilities();
     if (attachmentCapabilitiesBeforeUpload.fileBlockReason !== null) {
       sendInFlightRef.current = false;

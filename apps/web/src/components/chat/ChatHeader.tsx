@@ -44,6 +44,7 @@ import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
 import { GuestShareIndicator } from "./GuestShareControls";
+import { ReadAloudToggle } from "./ReadAloudToggle";
 import { SharedTooltipTrigger } from "../ui/shared-tooltip";
 
 interface ChatHeaderProps {
@@ -410,6 +411,11 @@ export const ChatHeader = memo(function ChatHeader({
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
+      <ReadAloudToggle
+        environmentId={activeThreadEnvironmentId}
+        threadId={activeThreadId}
+        isServerThread={isServerThread}
+      />
     </div>
   );
 });
