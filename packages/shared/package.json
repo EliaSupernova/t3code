@@ -7,6 +7,10 @@
       "types": "./src/png.ts",
       "import": "./src/png.ts"
     },
+    "./readAloud": {
+      "types": "./src/readAloud.ts",
+      "import": "./src/readAloud.ts"
+    },
     "./pullRequestAnchor": {
       "types": "./src/pullRequestAnchor.ts",
       "import": "./src/pullRequestAnchor.ts"
