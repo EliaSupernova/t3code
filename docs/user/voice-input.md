@@ -170,3 +170,24 @@ same environment, language, and dictionary as the composer, but skips transcript
 cleanup even when it is on, so you see what the model heard. Browser recording
 needs HTTPS or localhost and microphone permission; for a remote server over
 plain HTTP, use the desktop app.
+
+## Read replies aloud
+
+On web and desktop, the speaker button above a chat reads new replies aloud
+while they are written. It is off until you turn it on, and each device
+remembers its choice. Code, links, and tool activity are not read. Sending a
+message, stopping the reply, or opening another thread silences it. A long reply
+stops being read after about 3,000 characters.
+
+Speech comes from ElevenLabs, which receives the text being read and bills your
+account for it. Add your API key on the computer that runs T3 Code. On a Mac,
+run this and paste the key when asked:
+
+```sh
+security add-generic-password -a "$USER" -s elevenlabs-api-key -w
+```
+
+On other systems, set `ELEVENLABS_API_KEY` for the T3 Code server.
+
+If speech starts only when a reply is finished, open **Settings → Threads** and set
+**Response streaming** to **Show finished paragraphs**.
