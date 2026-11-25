@@ -1,7 +1,7 @@
+import { READ_ALOUD_MAX_REQUEST_CHARS } from "@t3tools/contracts";
+
 /** Cost cap: spoken characters per reply. After this the rest of the reply stays silent. */
 export const READ_ALOUD_MAX_REPLY_CHARS = 3_000;
-/** The longest piece sent for synthesis at once; a longer sentence is split between words. */
-const READ_ALOUD_MAX_CHUNK_CHARS = 500;
 
 const TERMINATORS = ".!?…。！？";
 const FULL_WIDTH_TERMINATORS = "。！？";
@@ -72,12 +72,13 @@ function cleanProse(raw: string): string {
   );
 }
 
+/** A sentence too long for one synthesis request is split between words. */
 function splitLong(sentence: string): string[] {
   const pieces: string[] = [];
   let rest = sentence;
-  while (rest.length > READ_ALOUD_MAX_CHUNK_CHARS) {
-    const space = rest.lastIndexOf(" ", READ_ALOUD_MAX_CHUNK_CHARS);
-    const cut = space > 0 ? space : READ_ALOUD_MAX_CHUNK_CHARS;
+  while (rest.length > READ_ALOUD_MAX_REQUEST_CHARS) {
+    const space = rest.lastIndexOf(" ", READ_ALOUD_MAX_REQUEST_CHARS);
+    const cut = space > 0 ? space : READ_ALOUD_MAX_REQUEST_CHARS;
     pieces.push(rest.slice(0, cut));
     rest = rest.slice(cut).trimStart();
   }

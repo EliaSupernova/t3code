@@ -12,6 +12,8 @@ import {
   type AuthEnvironmentScope,
   CloudSpeechError,
   DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS,
+  READ_ALOUD_MAX_REQUEST_CHARS,
+  ReadAloudError,
   SPEECH_MAX_OPTIONS_BYTES,
   TextGenerationError,
   DEFAULT_SERVER_SETTINGS,
@@ -31,6 +33,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import type * as NetAddress from "effect/net/NetAddress";
 import * as SpeechService from "./SpeechService.ts";
 import * as CloudSpeech from "./CloudSpeech.ts";
+import * as ReadAloud from "./ReadAloud.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
@@ -53,6 +56,7 @@ const principal = (...scopes: AuthEnvironmentScope[]) => principalWith(new Set(s
 
 const dependencies = Layer.mergeAll(
   Layer.mock(CloudSpeech.CloudSpeech)({}),
+  Layer.mock(ReadAloud.ReadAloud)({}),
   Layer.mock(ProviderRegistry.ProviderRegistry)({ getProviders: Effect.succeed([]) }),
   Layer.mock(ServerSettings.ServerSettingsService)({
     getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
@@ -391,6 +395,65 @@ effectIt.effect.each([
         reason,
       });
     }),
+);
+
+effectIt.effect("serves read-aloud audio to operators only", () =>
+  Effect.gen(function* () {
+    const scopes = new Set<AuthEnvironmentScope>();
+    const synthesize = vi.fn((text: string) =>
+      text === "no key"
+        ? Effect.fail(new ReadAloudError({ reason: "missing-key" }))
+        : Effect.succeed(new Uint8Array([73, 68, 51])),
+    );
+    const { handler, dispose } = HttpRouter.toWebHandler(
+      HttpApiBuilder.layer(HttpApi.make("environment").add(EnvironmentVoiceHttpApi)).pipe(
+        Layer.provide(speechHttpApiLayer),
+        Layer.provide(principalWith(scopes)),
+        Layer.provide(
+          Layer.mock(ReadAloud.ReadAloud)({ available: Effect.succeed(true), synthesize }),
+        ),
+        Layer.provide(Layer.mock(SpeechService.SpeechService)({})),
+        Layer.provide(dependencies),
+        Layer.provide(HttpServer.layerServices),
+        Layer.provide(NodeServices.layer),
+      ),
+      { disableLogger: true },
+    );
+    yield* Effect.addFinalizer(() => Effect.promise(dispose));
+    const context = yield* Layer.build(NodeServices.layer);
+    const call = (init?: RequestInit) =>
+      Effect.promise(() =>
+        handler(new Request("http://localhost/api/voice/read-aloud", init), context),
+      );
+    const say = (text: string) =>
+      call({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    expect((yield* call()).status).toBe(403);
+    expect((yield* say("Hello.")).status).toBe(403);
+    expect(synthesize).not.toHaveBeenCalled();
+
+    scopes.add(AuthOrchestrationOperateScope);
+    const status = yield* call();
+    expect(yield* Effect.promise(() => status.json())).toEqual({ available: true });
+    const audio = yield* say("Hello.");
+    expect(audio.status).toBe(200);
+    expect(new Uint8Array(yield* Effect.promise(() => audio.arrayBuffer()))).toEqual(
+      new Uint8Array([73, 68, 51]),
+    );
+    const refused = yield* say("no key");
+    expect(refused.status).toBe(422);
+    expect(yield* Effect.promise(() => refused.json())).toEqual({
+      _tag: "ReadAloudError",
+      reason: "missing-key",
+    });
+    // An oversized or empty request never reaches the paid service.
+    expect((yield* say("a".repeat(READ_ALOUD_MAX_REQUEST_CHARS + 1))).status).toBe(400);
+    expect((yield* say("")).status).toBe(400);
+    expect(synthesize).toHaveBeenCalledTimes(2);
+  }),
 );
 
 effectIt.effect("tells the client why transcript cleanup failed", () =>

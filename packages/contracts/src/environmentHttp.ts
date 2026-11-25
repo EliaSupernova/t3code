@@ -71,6 +71,7 @@ import {
   EnvironmentSpeechStatus,
   EnvironmentSpeechTranscriptionResult,
 } from "./speech.ts";
+import { ReadAloudError, ReadAloudRequest, ReadAloudStatus } from "./readAloud.ts";
 import { PeerLinkClientPairingCredential, PeerLinkClientPairingRequest } from "./peerLink.ts";
 import { SecretReference } from "./secretReference.ts";
 import {
@@ -983,6 +984,22 @@ export class EnvironmentVoiceHttpApi extends HttpApiGroup.make("voice")
     })
       .middleware(EnvironmentVoiceBodyLimit)
       .middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("readAloudStatus", "/api/voice/read-aloud", {
+      headers: OptionalBearerHeaders,
+      success: ReadAloudStatus,
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    // The answer is MP3 audio; the key that pays for it never leaves the environment.
+    HttpApiEndpoint.post("readAloud", "/api/voice/read-aloud", {
+      headers: OptionalBearerHeaders,
+      payload: ReadAloudRequest,
+      success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+      error: [...EnvironmentScopedOperationErrors, ReadAloudError],
+    }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
     HttpApiEndpoint.post("postProcess", "/api/voice/post-process", {

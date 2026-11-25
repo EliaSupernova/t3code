@@ -29,6 +29,7 @@ import {
 } from "../auth/http.ts";
 import * as SpeechPostProcessing from "./postProcessing.ts";
 import * as CloudSpeech from "./CloudSpeech.ts";
+import * as ReadAloud from "./ReadAloud.ts";
 import * as SpeechService from "./SpeechService.ts";
 
 const MAX_TRANSCRIBE_BODY_BYTES = SpeechService.MAX_SPEECH_BYTES + SPEECH_MAX_OPTIONS_BYTES + 4;
@@ -83,6 +84,7 @@ export const speechHttpApiLayer = HttpApiBuilder.group(
     const speech = yield* SpeechService.SpeechService;
     const cloud = yield* CloudSpeech.CloudSpeech;
     const postProcessing = yield* SpeechPostProcessing.SpeechPostProcessing;
+    const readAloud = yield* ReadAloud.ReadAloud;
     const guard = Effect.fnUntraced(function* (
       endpoint: string,
       scope: AuthEnvironmentScope = AuthOrchestrationOperateScope,
@@ -238,6 +240,20 @@ export const speechHttpApiLayer = HttpApiBuilder.group(
             .transcribe(decoded.value.pcm, decoded.value.options)
             .pipe(mapSpeechError);
           return { text };
+        }),
+      )
+      .handle(
+        "readAloudStatus",
+        Effect.fn("environment.voice.readAloudStatus")(function* (args) {
+          yield* guard(args.endpoint.name);
+          return { available: yield* readAloud.available };
+        }),
+      )
+      .handle(
+        "readAloud",
+        Effect.fn("environment.voice.readAloud")(function* (args) {
+          yield* guard(args.endpoint.name);
+          return yield* readAloud.synthesize(args.payload.text);
         }),
       )
       .handle(
